@@ -1,20 +1,26 @@
 package org.sid.ebankingbackend;
 
+import org.sid.ebankingbackend.dtos.BankAccountDTO;
+import org.sid.ebankingbackend.dtos.CurrentBankAccountDTO;
+import org.sid.ebankingbackend.dtos.CustomerDTO;
+import org.sid.ebankingbackend.dtos.SavingBankAccountDTO;
 import org.sid.ebankingbackend.entities.*;
 import org.sid.ebankingbackend.enums.AccountStatus;
 import org.sid.ebankingbackend.enums.OperationType;
+import org.sid.ebankingbackend.exceptions.BalanceNotSufficientException;
+import org.sid.ebankingbackend.exceptions.BankAccountNotFoundException;
+import org.sid.ebankingbackend.exceptions.CustomerNotFoundException;
 import org.sid.ebankingbackend.repositories.AccountOperationRepository;
 import org.sid.ebankingbackend.repositories.BankAccountRpository;
 import org.sid.ebankingbackend.repositories.CustomerRepository;
-import org.sid.ebankingbackend.services.BankService;
+import org.sid.ebankingbackend.services.BankAccountService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
-import org.springframework.data.repository.NoRepositoryBean;
 
-import javax.transaction.Transactional;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -26,9 +32,49 @@ public class EbankingBackendApplication {
     }
 
     @Bean
-    CommandLineRunner commandLineRunner(BankService bankService){
+    CommandLineRunner commandLineRunner(BankAccountService bankAccountService){
         return args -> {
-            bankService.consulter();
+            Stream.of("Alfred", "Aella", "Sutton").forEach(name -> {
+                CustomerDTO customer = new CustomerDTO();
+                customer.setName(name);
+                customer.setEmail(name + "@gmail.com");
+                bankAccountService.saveCustomer(customer);
+            });
+            bankAccountService.listCustomers().forEach(cust -> {
+                try {
+                    bankAccountService.
+                            saveCurrentBankAccount(
+                                    Math.random()*90000,
+                                    9000,
+                                    cust.getId());
+                    bankAccountService.
+                            saveSavingBankAccount(
+                                    Math.random()*120000,
+                                    5.5,
+                                    cust.getId());
+                } catch (CustomerNotFoundException e) {
+                    e.printStackTrace();
+                }
+            });
+            List<BankAccountDTO> bankAccounts = bankAccountService.bankAccountList();
+
+            for(BankAccountDTO bankAccount: bankAccounts){
+                for(int i = 0; i < 10; i++){
+                    String accountId;
+                    if(bankAccount instanceof SavingBankAccountDTO){
+                        accountId = ((SavingBankAccountDTO) bankAccount).getId();
+                    }
+                    else {
+                        accountId = ((CurrentBankAccountDTO) bankAccount).getId();
+                    }
+                    bankAccountService.credit(accountId,
+                            10000 + Math.random() * 120000,
+                            "Credit");
+                    bankAccountService.debit(accountId,
+                            1000 + Math.random() * 9000,
+                            "Debit");
+                }
+            }
         };
     }
 
